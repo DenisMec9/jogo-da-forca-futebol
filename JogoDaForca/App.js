@@ -177,7 +177,7 @@ export default function App() {
         
         {/* Título */}
         <Text style={styles.title}>
-          Forca na Rede
+          Jogo da forca
         </Text>
 
         {/* Desenho do Boneco e da Trave */}
