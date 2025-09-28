@@ -11,40 +11,49 @@ const WORDS = [
   'CARRINHO', 'PASSES', 'TITE', 'PELÉ', 'NEYMAR'
 ];
 
-// Número máximo de tentativas (Faltas permitidas antes do Cartão Vermelho)
+// Número máximo de tentativas (partes do boneco)
 const MAX_ATTEMPTS = 6;
 
 /**
- * Componente que renderiza a cena da penalidade (Gol e Cartões) baseada no número de erros.
- * O desenho é progressivo, de 1 a 6 faltas.
+ * Componente que renderiza o boneco da Forca baseado no número de erros.
+ * Usa Views e estilos para simular o desenho sobre uma trave de futebol.
  */
-const PenaltyDrawing = ({ attempts }) => {
-  // Elementos da cena (Gol e Cartões)
-  const SCENE_ELEMENTS = [
-    // 1. Poste Esquerdo (attempts >= 1)
-    <View key="post-left" style={[styles.goalPost, styles.goalPostLeft]} />,
-    // 2. Poste Direito (attempts >= 2)
-    <View key="post-right" style={[styles.goalPost, styles.goalPostRight]} />,
-    // 3. Travessão (attempts >= 3)
-    <View key="crossbar" style={styles.goalCrossbar} />,
-    // 4. Rede (attempts >= 4) - Simulado com uma View simples
-    <View key="net" style={styles.goalNet} />,
-    // 5. Cartão Amarelo (attempts >= 5) - Grande aviso
-    <View key="yellow-card" style={styles.yellowCard} />,
-    // 6. Cartão Vermelho (attempts >= 6) - FIM DE JOGO
-    <View key="red-card" style={styles.redCard} />,
+const HangmanDrawing = ({ attempts }) => {
+  // Array de componentes (Views) que representam as partes do corpo
+  const BODY_PARTS = [
+    // 1. Cabeça (attempts >= 1) - Com cor de pele clara
+    <View key="head" style={[styles.hangmanHead, { backgroundColor: '#FFDEAD' }]} />,
+    // 2. Corpo (attempts >= 2) - Com cor de camisa de time
+    <View key="body" style={[styles.hangmanBody, { backgroundColor: '#FFD700' }]} />,
+    // 3. Braço esquerdo (attempts >= 3)
+    <View key="left-arm" style={[styles.hangmanArm, styles.hangmanLeftArm]} />,
+    // 4. Braço direito (attempts >= 4)
+    <View key="right-arm" style={[styles.hangmanArm, styles.hangmanRightArm]} />,
+    // 5. Perna esquerda (attempts >= 5) - Com cor de chuteira
+    <View key="left-leg" style={[styles.hangmanLeg, styles.hangmanLeftLeg]} />,
+    // 6. Perna direita (attempts >= 6)
+    <View key="right-leg" style={[styles.hangmanLeg, styles.hangmanRightLeg]} />,
   ];
 
-  // Filtra os elementos para desenhar
-  const elementsToDraw = SCENE_ELEMENTS.slice(0, attempts);
+  // Filtra as partes do corpo para desenhar apenas as correspondentes aos erros
+  const partsToDraw = BODY_PARTS.slice(0, attempts);
 
   return (
     <View style={styles.drawingContainer}>
-      {/* O campo de fundo/base (Penalty Area) */}
-      <View style={styles.penaltyArea} />
+      {/* Desenha o Boneco */}
+      {partsToDraw}
       
-      {/* Desenha a Cena */}
-      {elementsToDraw}
+      {/* Estrutura da Forca (Estilo Trave/Gol) */}
+      {/* Corda/Cabo da Forca (pendura o boneco) */}
+      <View style={styles.gallowsRope} /> 
+      {/* Viga horizontal (Travessão) */}
+      <View style={styles.gallowsTop} /> 
+      {/* Poste vertical (Trave Esquerda) */}
+      <View style={styles.gallowsVertical} /> 
+      {/* Chão (Linha de Fundo) */}
+      <View style={styles.gallowsBase} /> 
+      {/* Rede (apenas decorativa) */}
+      <View style={styles.goalNet} />
     </View>
   );
 };
@@ -60,6 +69,10 @@ const Keyboard = ({ guessedLetters, handleGuess, gameStatus }) => {
       {ALPHABET.map(letter => {
         const isGuessed = guessedLetters.includes(letter);
         const isDisabled = isGuessed || gameStatus !== 'playing';
+        
+        // Verifica se a letra foi correta ou incorreta (para cores do teclado)
+        const isCorrect = isGuessed && guessedLetters.includes(letter) && gameStatus !== 'playing' && letter.includes(letter); // Simplificado para usar a lógica do guessedLetters
+        const isWrong = isGuessed && !isCorrect;
 
         return (
           <TouchableOpacity
@@ -67,6 +80,7 @@ const Keyboard = ({ guessedLetters, handleGuess, gameStatus }) => {
             style={[
               styles.keyButton,
               isGuessed && styles.keyButtonGuessed,
+              isGuessed && !isCorrect && styles.keyButtonWrong,
               isDisabled && styles.keyButtonDisabled,
             ]}
             onPress={() => handleGuess(letter)}
@@ -86,7 +100,7 @@ const Keyboard = ({ guessedLetters, handleGuess, gameStatus }) => {
 export default function App() {
   const [word, setWord] = useState('');
   const [guessedLetters, setGuessedLetters] = useState([]);
-  const [attempts, setAttempts] = useState(0); // Faltas (erros)
+  const [attempts, setAttempts] = useState(0); // Erros
   const [gameStatus, setGameStatus] = useState('playing'); // 'playing', 'won', 'lost'
 
   /**
@@ -106,21 +120,21 @@ export default function App() {
     startNewGame();
   }, [startNewGame]);
 
-  // Efeito para verificar o status do jogo (GOLAÇO ou Cartão Vermelho)
+  // Efeito para verificar o status do jogo (Vitória ou Derrota)
   useEffect(() => {
     if (!word || gameStatus !== 'playing') return;
 
-    // Condição de GOLAÇO: todas as letras únicas da palavra foram adivinhadas
+    // Condição de Vitória: todas as letras únicas da palavra foram adivinhadas
     const uniqueLetters = [...new Set(word.split(''))];
     const hasWon = uniqueLetters.every(letter => guessedLetters.includes(letter));
     
     if (hasWon) {
       setGameStatus('won');
     } 
-    // Condição de Cartão Vermelho: número máximo de faltas excedido
+    // Condição de Derrota: número máximo de tentativas excedido
     else if (attempts >= MAX_ATTEMPTS) {
       setGameStatus('lost');
-      Alert.alert('❌ CARTÃO VERMELHO!', `Faltas demais! A palavra era: ${word}`);
+      Alert.alert('❌ CARTÃO VERMELHO!', `O boneco foi enforcado! A palavra era: ${word}`);
     }
   }, [guessedLetters, attempts, word, gameStatus]);
 
@@ -136,7 +150,7 @@ export default function App() {
 
     // Verifica se a letra está na palavra
     if (!word.includes(letter)) {
-      setAttempts(prev => prev + 1); // Incrementa falta
+      setAttempts(prev => prev + 1); // Incrementa erro
     }
   };
 
@@ -166,8 +180,8 @@ export default function App() {
           Forca na Rede
         </Text>
 
-        {/* Desenho da Cena de Penalidade */}
-        <PenaltyDrawing attempts={attempts} />
+        {/* Desenho do Boneco e da Trave */}
+        <HangmanDrawing attempts={attempts} />
 
         {/* Palavra a ser adivinhada */}
         <Text style={styles.wordDisplay}>
@@ -178,13 +192,13 @@ export default function App() {
         {gameStatus !== 'playing' && (
           <View style={[styles.statusBox, gameStatus === 'won' ? styles.statusBoxWin : styles.statusBoxLose]}>
             <Text style={styles.statusText}>
-              {gameStatus === 'won' ? '⚽ GOLAÇO! VOCÊ ACERTOU! ⚽' : '🛑 FIM DE JOGO! CARTÃO VERMELHO! 🛑'}
+              {gameStatus === 'won' ? '🏆 GOLAÇO! VOCÊ ACERTOU! 🏆' : '💀 FIM DE JOGO! O boneco foi enforcado! 💀'}
             </Text>
             <Text style={styles.wordRevealText}>A palavra era: <Text style={styles.wordRevealHighlight}>{word}</Text></Text>
           </View>
         )}
         
-        {/* Faltas restantes */}
+        {/* Tentativas restantes */}
         <Text style={styles.attemptsText}>
           Faltas Acumuladas: <Text style={styles.attemptsValue}>{attempts} / {MAX_ATTEMPTS}</Text>
         </Text>
@@ -194,7 +208,7 @@ export default function App() {
           style={styles.restartButton}
           onPress={startNewGame}
         >
-          <Text style={styles.restartButtonIcon}>🥅</Text> 
+          <Text style={styles.restartButtonIcon}>🔄</Text> 
           <Text style={styles.restartButtonText}>Novo Confronto</Text>
         </TouchableOpacity>
 
@@ -278,69 +292,102 @@ const styles = StyleSheet.create({
     marginVertical: 20,
     justifyContent: 'flex-end',
     alignItems: 'center',
-    backgroundColor: '#38761D', // Verde um pouco mais claro para a área
+    backgroundColor: '#38761D', // Verde um pouco mais claro para a área do gol
     borderRadius: 10,
     borderWidth: 2,
     borderColor: '#FFFFFF', // Linha branca do campo
   },
-  penaltyArea: {
-    position: 'absolute',
-    height: '80%',
-    width: '90%',
-    borderColor: '#FFFFFF',
-    borderWidth: 2,
-    borderRadius: 8,
-    opacity: 0.2,
-  },
-  // Gol
-  goalPost: {
-    width: 5,
-    height: 120,
-    backgroundColor: '#FFFFFF', // Postes brancos
+  // Estrutura do Gol (Forca)
+  gallowsBase: {
+    width: '100%',
+    height: 5,
+    backgroundColor: '#FFFFFF', // Linha de Fundo
     position: 'absolute',
     bottom: 0,
   },
-  goalPostLeft: { left: 45 },
-  goalPostRight: { right: 45 },
-  goalCrossbar: {
-    width: 155,
-    height: 5,
-    backgroundColor: '#FFFFFF',
+  gallowsVertical: {
+    width: 5,
+    height: 150,
+    backgroundColor: '#FFFFFF', // Trave Vertical
     position: 'absolute',
-    top: 75,
+    left: 40,
+    bottom: 0,
+  },
+  gallowsTop: {
+    width: 100,
+    height: 5,
+    backgroundColor: '#FFFFFF', // Travessão
+    position: 'absolute',
+    top: 45,
+    left: 40,
+  },
+  gallowsRope: {
+    width: 3,
+    height: 25,
+    backgroundColor: '#B22222', // Cor de Árbitro/Suspensão
+    position: 'absolute',
+    top: 50,
+    left: 140,
   },
   goalNet: {
-    width: 155,
-    height: 125,
+    width: '100%',
+    height: '100%',
     borderColor: '#FFFFFF',
     borderWidth: 1,
-    opacity: 0.5,
+    opacity: 0.1,
     position: 'absolute',
-    bottom: 0,
+    top: 0,
+    left: 0,
   },
-  // Cartões (Visíveis apenas nas últimas faltas)
-  yellowCard: {
-    width: 50,
-    height: 70,
-    backgroundColor: '#FFD700', // Amarelo
-    borderWidth: 2,
+
+  // Partes do Boneco
+  hangmanHead: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 3,
     borderColor: '#333',
     position: 'absolute',
-    top: 5,
-    right: 5,
-    transform: [{ rotate: '-15deg' }],
+    top: 75,
+    left: 125,
   },
-  redCard: {
-    width: 50,
-    height: 70,
-    backgroundColor: '#DC2626', // Vermelho
-    borderWidth: 2,
-    borderColor: '#333',
+  hangmanBody: {
+    width: 3,
+    height: 40,
+    backgroundColor: '#FFD700', // Camisa Amarela
     position: 'absolute',
-    top: 5,
-    left: 5,
-    transform: [{ rotate: '15deg' }],
+    top: 105,
+    left: 140,
   },
+  hangmanArm: {
+    width: 3,
+    height: 30,
+    backgroundColor: '#FFD700',
+    position: 'absolute',
+    top: 110,
+    left: 140,
+  },
+  hangmanLeftArm: {
+    transform: [{ rotate: '45deg' }, { translateX: -15 }],
+  },
+  hangmanRightArm: {
+    transform: [{ rotate: '-45deg' }, { translateX: 15 }],
+  },
+  hangmanLeg: {
+    width: 3,
+    height: 35,
+    backgroundColor: '#333', // Chuteira/Calção
+    position: 'absolute',
+    top: 140,
+    left: 140,
+  },
+  hangmanLeftLeg: {
+    transform: [{ rotate: '30deg' }, { translateX: -10 }],
+  },
+  hangmanRightLeg: {
+    transform: [{ rotate: '-30deg' }, { translateX: 10 }],
+  },
+  
   // --- Fim de Jogo ---
   statusBox: {
     padding: 15,
