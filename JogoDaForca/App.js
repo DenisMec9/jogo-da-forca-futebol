@@ -1,285 +1,481 @@
-// App.js
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ScrollView,
-  SafeAreaView,
-} from 'react-native';
-import { Svg, Line, Circle, Path } from 'react-native-svg';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, SafeAreaView, ScrollView } from 'react-native';
 
+// Lista de palavras relacionadas a futebol
 const WORDS = [
-  'REACT', 'JAVASCRIPT', 'EXPRESS', 'NODE', 'POSTGRESQL',
-  'SEQUELIZE', 'VERCEL', 'GITHUB', 'MOBILE', 'ANDROID',
-  'IOS', 'TYPESCRIPT', 'EXPO', 'FORCA', 'DESENVOLVEDOR',
-  'PROGRAMACAO', 'ALGORITMO', 'FUNCAO', 'COMPONENTE', 'ESTADO',
-  'PROPS', 'HOOKS', 'USESTATE', 'USEEFFECT', 'API',
-  'BANCO', 'DADOS', 'CRUD', 'HTTP', 'JSON'
+  'ZAGUEIRO', 'GOLEIRO', 'ATAQUE', 'LATERAL', 'CHUTEIRA',
+  'TRAVE', 'GOL', 'PENALTI', 'ESCANTEIO', 'JUIZ',
+  'CAMISA', 'ARQUIBANCADA', 'GRAMADO', 'BANDERA', 'FALTA',
+  'ESCUDO', 'CAPITAO', 'CONVOCACAO', 'COPINHA', 'MARACANA',
+  'HEXACAMPEAO', 'TORCEDOR', 'VITORIA', 'EMPATE', 'DERROTA',
+  'CARRINHO', 'PASSES', 'TITE', 'PELÉ', 'NEYMAR'
 ];
 
+// Número máximo de tentativas (Faltas permitidas antes do Cartão Vermelho)
 const MAX_ATTEMPTS = 6;
 
+/**
+ * Componente que renderiza a cena da penalidade (Gol e Cartões) baseada no número de erros.
+ * O desenho é progressivo, de 1 a 6 faltas.
+ */
+const PenaltyDrawing = ({ attempts }) => {
+  // Elementos da cena (Gol e Cartões)
+  const SCENE_ELEMENTS = [
+    // 1. Poste Esquerdo (attempts >= 1)
+    <View key="post-left" style={[styles.goalPost, styles.goalPostLeft]} />,
+    // 2. Poste Direito (attempts >= 2)
+    <View key="post-right" style={[styles.goalPost, styles.goalPostRight]} />,
+    // 3. Travessão (attempts >= 3)
+    <View key="crossbar" style={styles.goalCrossbar} />,
+    // 4. Rede (attempts >= 4) - Simulado com uma View simples
+    <View key="net" style={styles.goalNet} />,
+    // 5. Cartão Amarelo (attempts >= 5) - Grande aviso
+    <View key="yellow-card" style={styles.yellowCard} />,
+    // 6. Cartão Vermelho (attempts >= 6) - FIM DE JOGO
+    <View key="red-card" style={styles.redCard} />,
+  ];
+
+  // Filtra os elementos para desenhar
+  const elementsToDraw = SCENE_ELEMENTS.slice(0, attempts);
+
+  return (
+    <View style={styles.drawingContainer}>
+      {/* O campo de fundo/base (Penalty Area) */}
+      <View style={styles.penaltyArea} />
+      
+      {/* Desenha a Cena */}
+      {elementsToDraw}
+    </View>
+  );
+};
+
+/**
+ * Componente do Teclado Virtual (Botões de Letras).
+ */
+const Keyboard = ({ guessedLetters, handleGuess, gameStatus }) => {
+  const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+  return (
+    <View style={styles.keyboardContainer}>
+      {ALPHABET.map(letter => {
+        const isGuessed = guessedLetters.includes(letter);
+        const isDisabled = isGuessed || gameStatus !== 'playing';
+
+        return (
+          <TouchableOpacity
+            key={letter}
+            style={[
+              styles.keyButton,
+              isGuessed && styles.keyButtonGuessed,
+              isDisabled && styles.keyButtonDisabled,
+            ]}
+            onPress={() => handleGuess(letter)}
+            disabled={isDisabled}
+          >
+            <Text style={styles.keyText}>{letter}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
+
+/**
+ * Componente principal do Jogo da Forca (Tema Futebol).
+ */
 export default function App() {
   const [word, setWord] = useState('');
   const [guessedLetters, setGuessedLetters] = useState([]);
-  const [attempts, setAttempts] = useState(0);
-  const [gameStatus, setGameStatus] = useState('playing');
-  const [inputValue, setInputValue] = useState('');
+  const [attempts, setAttempts] = useState(0); // Faltas (erros)
+  const [gameStatus, setGameStatus] = useState('playing'); // 'playing', 'won', 'lost'
 
-  const startNewGame = () => {
-    const randomWord = WORDS[Math.floor(Math.random() * WORDS.length)];
+  /**
+   * Inicializa um novo jogo.
+   */
+  const startNewGame = useCallback(() => {
+    const randomIndex = Math.floor(Math.random() * WORDS.length);
+    const randomWord = WORDS[randomIndex];
+    
     setWord(randomWord);
     setGuessedLetters([]);
     setAttempts(0);
     setGameStatus('playing');
-    setInputValue('');
-  };
-
-  useEffect(() => {
-    startNewGame();
   }, []);
 
   useEffect(() => {
-    const revealed = word.split('').every(letter => guessedLetters.includes(letter));
-    if (revealed && word) {
+    startNewGame();
+  }, [startNewGame]);
+
+  // Efeito para verificar o status do jogo (GOLAÇO ou Cartão Vermelho)
+  useEffect(() => {
+    if (!word || gameStatus !== 'playing') return;
+
+    // Condição de GOLAÇO: todas as letras únicas da palavra foram adivinhadas
+    const uniqueLetters = [...new Set(word.split(''))];
+    const hasWon = uniqueLetters.every(letter => guessedLetters.includes(letter));
+    
+    if (hasWon) {
       setGameStatus('won');
-    } else if (attempts >= MAX_ATTEMPTS) {
+    } 
+    // Condição de Cartão Vermelho: número máximo de faltas excedido
+    else if (attempts >= MAX_ATTEMPTS) {
       setGameStatus('lost');
+      Alert.alert('❌ CARTÃO VERMELHO!', `Faltas demais! A palavra era: ${word}`);
     }
-  }, [guessedLetters, attempts, word]);
+  }, [guessedLetters, attempts, word, gameStatus]);
 
-  const handleGuess = () => {
-    const letter = inputValue.trim().toUpperCase();
-    if (!letter || letter.length !== 1 || !/[A-Z]/.test(letter)) {
-      Alert.alert('Inválido', 'Digite uma única letra.');
-      setInputValue('');
-      return;
-    }
-
-    if (guessedLetters.includes(letter)) {
-      Alert.alert('Atenção', 'Você já tentou essa letra!');
-      setInputValue('');
+  /**
+   * Lida com o chute de uma letra.
+   */
+  const handleGuess = (letter) => {
+    if (gameStatus !== 'playing' || guessedLetters.includes(letter)) {
       return;
     }
 
     setGuessedLetters(prev => [...prev, letter]);
 
+    // Verifica se a letra está na palavra
     if (!word.includes(letter)) {
-      setAttempts(prev => prev + 1);
+      setAttempts(prev => prev + 1); // Incrementa falta
     }
-
-    setInputValue('');
   };
 
-  const displayWord = word
-    .split('')
-    .map(letter => (guessedLetters.includes(letter) ? letter : '_'))
-    .join(' ');
+  /**
+   * Palavra a ser exibida.
+   */
+  const displayWord = useMemo(() => {
+    return word
+      .split('')
+      .map(letter => (guessedLetters.includes(letter) ? letter : '_'))
+      .join(' ');
+  }, [word, guessedLetters]);
 
+
+  // Separa as letras em corretas (Acertos) e erradas (Faltas)
   const correctLetters = guessedLetters.filter(letter => word.includes(letter));
   const wrongLetters = guessedLetters.filter(letter => !word.includes(letter));
 
+
+  // --- Renderização da Interface ---
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Jogo da Forca</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.container}>
+        
+        {/* Título */}
+        <Text style={styles.title}>
+          Forca na Rede
+        </Text>
 
-      {/* Boneco da forca */}
-      <View style={styles.hangmanContainer}>
-        <Svg width="200" height="250" viewBox="0 0 200 250">
-          {/* Forca */}
-          <Line x1="50" y1="230" x2="150" y2="230" stroke="#333" strokeWidth="4" />
-          <Line x1="100" y1="230" x2="100" y2="30" stroke="#333" strokeWidth="4" />
-          <Line x1="100" y1="30" x2="160" y2="30" stroke="#333" strokeWidth="4" />
-          <Line x1="160" y1="30" x2="160" y2="60" stroke="#333" strokeWidth="4" />
+        {/* Desenho da Cena de Penalidade */}
+        <PenaltyDrawing attempts={attempts} />
 
-          {/* Cabeça */}
-          {attempts >= 1 && <Circle cx="160" cy="75" r="15" stroke="#333" strokeWidth="3" fill="none" />}
-          {/* Corpo */}
-          {attempts >= 2 && <Line x1="160" y1="90" x2="160" y2="150" stroke="#333" strokeWidth="3" />}
-          {/* Braço esquerdo */}
-          {attempts >= 3 && <Line x1="160" y1="110" x2="130" y2="100" stroke="#333" strokeWidth="3" />}
-          {/* Braço direito */}
-          {attempts >= 4 && <Line x1="160" y1="110" x2="190" y2="100" stroke="#333" strokeWidth="3" />}
-          {/* Perna esquerda */}
-          {attempts >= 5 && <Line x1="160" y1="150" x2="140" y2="190" stroke="#333" strokeWidth="3" />}
-          {/* Perna direita */}
-          {attempts >= 6 && <Line x1="160" y1="150" x2="180" y2="190" stroke="#333" strokeWidth="3" />}
-        </Svg>
-      </View>
+        {/* Palavra a ser adivinhada */}
+        <Text style={styles.wordDisplay}>
+          {displayWord}
+        </Text>
+        
+        {/* Mensagem de Fim de Jogo */}
+        {gameStatus !== 'playing' && (
+          <View style={[styles.statusBox, gameStatus === 'won' ? styles.statusBoxWin : styles.statusBoxLose]}>
+            <Text style={styles.statusText}>
+              {gameStatus === 'won' ? '⚽ GOLAÇO! VOCÊ ACERTOU! ⚽' : '🛑 FIM DE JOGO! CARTÃO VERMELHO! 🛑'}
+            </Text>
+            <Text style={styles.wordRevealText}>A palavra era: <Text style={styles.wordRevealHighlight}>{word}</Text></Text>
+          </View>
+        )}
+        
+        {/* Faltas restantes */}
+        <Text style={styles.attemptsText}>
+          Faltas Acumuladas: <Text style={styles.attemptsValue}>{attempts} / {MAX_ATTEMPTS}</Text>
+        </Text>
 
-      {/* Palavra */}
-      <Text style={styles.word}>{displayWord}</Text>
+        {/* Botão Reiniciar */}
+        <TouchableOpacity 
+          style={styles.restartButton}
+          onPress={startNewGame}
+        >
+          <Text style={styles.restartButtonIcon}>🥅</Text> 
+          <Text style={styles.restartButtonText}>Novo Confronto</Text>
+        </TouchableOpacity>
 
-      {/* Input de letra */}
-      {gameStatus === 'playing' && (
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Digite uma letra"
-            value={inputValue}
-            onChangeText={setInputValue}
-            maxLength={1}
-            autoCapitalize="characters"
-            keyboardType="default"
-          />
-          <TouchableOpacity style={styles.button} onPress={handleGuess}>
-            <Text style={styles.buttonText}>Chutar</Text>
-          </TouchableOpacity>
+        {/* Teclado Virtual (Teclado) */}
+        <Keyboard 
+          guessedLetters={guessedLetters} 
+          handleGuess={handleGuess} 
+          gameStatus={gameStatus}
+        />
+        
+        {/* Lista de Tentativas Anteriores (Diferenciadas) */}
+        <View style={styles.guessedLettersContainer}>
+            <Text style={styles.guessedLettersTitle}>Acertos (Passes Certos):</Text>
+            <View style={styles.letterList}>
+                {correctLetters.map((letter, i) => (
+                    <Text key={`c-${i}`} style={[styles.guessedLetter, styles.correctLetter]}>
+                        {letter}
+                    </Text>
+                ))}
+            </View>
+
+            <Text style={styles.guessedLettersTitle}>Faltas (Erros no Passe):</Text>
+            <View style={styles.letterList}>
+                {wrongLetters.map((letter, i) => (
+                    <Text key={`w-${i}`} style={[styles.guessedLetter, styles.wrongLetter]}>
+                        {letter}
+                    </Text>
+                ))}
+            </View>
         </View>
-      )}
 
-      {/* Letras tentadas */}
-      <View style={styles.lettersContainer}>
-        <Text style={styles.sectionTitle}>Letras usadas:</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.lettersScroll}>
-          {correctLetters.map((letter, i) => (
-            <Text key={`c-${i}`} style={[styles.letter, styles.correctLetter]}>{letter}</Text>
-          ))}
-          {wrongLetters.map((letter, i) => (
-            <Text key={`w-${i}`} style={[styles.letter, styles.wrongLetter]}>{letter}</Text>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Mensagem de fim de jogo */}
-      {gameStatus !== 'playing' && (
-        <View style={styles.messageContainer}>
-          <Text style={gameStatus === 'won' ? styles.winText : styles.loseText}>
-            {gameStatus === 'won' ? '🎉 Parabéns! Você venceu!' : '💀 Você perdeu!'}
-          </Text>
-          <Text style={styles.finalWord}>A palavra era: {word}</Text>
-        </View>
-      )}
-
-      {/* Botão Reiniciar */}
-      <TouchableOpacity style={styles.restartButton} onPress={startNewGame}>
-        <Text style={styles.restartButtonText}>🔄 Novo Jogo</Text>
-      </TouchableOpacity>
-
-      {/* Tentativas restantes */}
-      <Text style={styles.attemptsText}>
-        Tentativas restantes: {MAX_ATTEMPTS - attempts}
-      </Text>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
+// Estilos do React Native
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#f0f8ff',
+    backgroundColor: '#006400', // Campo de futebol verde escuro
+  },
+  container: {
     padding: 20,
     alignItems: 'center',
+    paddingBottom: 50,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginVertical: 10,
+    fontSize: 34,
+    fontWeight: '900',
+    color: '#FFD700', // Dourado
+    marginBottom: 20,
+    borderBottomWidth: 4,
+    borderBottomColor: '#FFD700',
+    paddingBottom: 5,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 1,
   },
-  hangmanContainer: {
+  wordDisplay: {
+    fontSize: 40,
+    letterSpacing: 10,
+    fontWeight: 'bold',
+    color: '#F0F4F8', // Branco no verde
     marginVertical: 20,
-  },
-  word: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    letterSpacing: 8,
-    color: '#2c3e50',
-    marginVertical: 20,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 15,
-  },
-  input: {
-    borderWidth: 2,
-    borderColor: '#3498db',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 20,
-    width: 80,
-    textAlign: 'center',
-    marginRight: 10,
-  },
-  button: {
-    backgroundColor: '#3498db',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  lettersContainer: {
-    marginVertical: 15,
-    width: '100%',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 8,
-  },
-  lettersScroll: {
-    flexDirection: 'row',
-  },
-  letter: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    paddingHorizontal: 8,
-    marginHorizontal: 2,
-    borderRadius: 6,
-  },
-  correctLetter: {
-    backgroundColor: '#2ecc71',
-    color: 'white',
-  },
-  wrongLetter: {
-    backgroundColor: '#e74c3c',
-    color: 'white',
-  },
-  messageContainer: {
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  winText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2ecc71',
-    marginBottom: 10,
-  },
-  loseText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#e74c3c',
-    marginBottom: 10,
-  },
-  finalWord: {
-    fontSize: 20,
-    color: '#2c3e50',
-  },
-  restartButton: {
-    backgroundColor: '#9b59b6',
-    paddingVertical: 14,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-    marginVertical: 10,
-  },
-  restartButtonText: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
+    minHeight: 50,
   },
   attemptsText: {
-    fontSize: 16,
-    color: '#7f8c8d',
+    fontSize: 18,
+    color: '#E0E0E0',
     marginTop: 10,
+  },
+  attemptsValue: {
+    fontWeight: 'bold',
+    color: '#FF4500', // Vermelho/Laranja (Cartão)
+  },
+  // --- Estilos da Cena de Penalidade (Drawing) ---
+  drawingContainer: {
+    height: 200,
+    width: 250,
+    marginVertical: 20,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    backgroundColor: '#38761D', // Verde um pouco mais claro para a área
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#FFFFFF', // Linha branca do campo
+  },
+  penaltyArea: {
+    position: 'absolute',
+    height: '80%',
+    width: '90%',
+    borderColor: '#FFFFFF',
+    borderWidth: 2,
+    borderRadius: 8,
+    opacity: 0.2,
+  },
+  // Gol
+  goalPost: {
+    width: 5,
+    height: 120,
+    backgroundColor: '#FFFFFF', // Postes brancos
+    position: 'absolute',
+    bottom: 0,
+  },
+  goalPostLeft: { left: 45 },
+  goalPostRight: { right: 45 },
+  goalCrossbar: {
+    width: 155,
+    height: 5,
+    backgroundColor: '#FFFFFF',
+    position: 'absolute',
+    top: 75,
+  },
+  goalNet: {
+    width: 155,
+    height: 125,
+    borderColor: '#FFFFFF',
+    borderWidth: 1,
+    opacity: 0.5,
+    position: 'absolute',
+    bottom: 0,
+  },
+  // Cartões (Visíveis apenas nas últimas faltas)
+  yellowCard: {
+    width: 50,
+    height: 70,
+    backgroundColor: '#FFD700', // Amarelo
+    borderWidth: 2,
+    borderColor: '#333',
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    transform: [{ rotate: '-15deg' }],
+  },
+  redCard: {
+    width: 50,
+    height: 70,
+    backgroundColor: '#DC2626', // Vermelho
+    borderWidth: 2,
+    borderColor: '#333',
+    position: 'absolute',
+    top: 5,
+    left: 5,
+    transform: [{ rotate: '15deg' }],
+  },
+  // --- Fim de Jogo ---
+  statusBox: {
+    padding: 15,
+    borderRadius: 15,
+    alignItems: 'center',
+    marginVertical: 15,
+    width: '90%',
+    borderWidth: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  statusBoxWin: {
+    backgroundColor: '#E6FFE6', // Verde pálido para Golaço
+    borderColor: '#008000',
+  },
+  statusBoxLose: {
+    backgroundColor: '#FFCCCC', // Vermelho pálido para Cartão
+    borderColor: '#B22222',
+  },
+  statusText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  wordRevealText: {
+    fontSize: 18,
+    marginTop: 5,
+    color: '#4B5563',
+  },
+  wordRevealHighlight: {
+    fontWeight: 'bold',
+    color: '#006400', // Verde escuro
+  },
+  // --- Botão Reiniciar ---
+  restartButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#B22222', // Marrom/Vermelho (Cor de árbitro)
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 50,
+    marginTop: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  restartButtonIcon: {
+    color: '#FFF',
+    fontSize: 20,
+    marginRight: 10,
+  },
+  restartButtonText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  // --- Teclado ---
+  keyboardContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: 30,
+    width: '100%',
+    maxWidth: 400,
+    paddingHorizontal: 10,
+  },
+  keyButton: {
+    width: 40,
+    height: 40,
+    margin: 4,
+    borderRadius: 8,
+    backgroundColor: '#FFD700', // Amarelo (Foco)
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  keyButtonGuessed: {
+    backgroundColor: '#808080', // Cinza (Tentada)
+  },
+  keyButtonDisabled: {
+    opacity: 0.5,
+  },
+  keyText: {
+    color: '#1E293B', // Cor de texto escuro
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // --- Tentativas Anteriores ---
+  guessedLettersContainer: {
+    marginTop: 30,
+    paddingHorizontal: 10,
+    width: '100%',
+    maxWidth: 400,
+  },
+  guessedLettersTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#E0E0E0',
+    marginBottom: 5,
+    marginTop: 10,
+  },
+  letterList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    minHeight: 30,
+    borderWidth: 1,
+    borderColor: '#38761D',
+    borderRadius: 8,
+    padding: 5,
+    backgroundColor: '#38761D', // Fundo verde da área
+  },
+  guessedLetter: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    margin: 3,
+    borderRadius: 4,
+  },
+  correctLetter: {
+    backgroundColor: '#00A000', // Verde escuro para acertos
+    color: '#FFFFFF',
+  },
+  wrongLetter: {
+    backgroundColor: '#B22222', // Vermelho para faltas
+    color: '#FFFFFF',
+    textDecorationLine: 'line-through', // Adiciona o risco
   },
 });
