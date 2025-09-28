@@ -20,13 +20,22 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.denis_barbosa.JogoDaForca"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "runtimeVersion": {
       "policy": "appVersion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "55b28332-6637-4d1f-9226-a21e058a694e"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/55b28332-6637-4d1f-9226-a21e058a694e"
     }
   }
 }
